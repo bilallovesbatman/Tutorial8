@@ -46,9 +46,16 @@ qplot(exp(rnorm(200)))
 Consider the logNormal data plotted in Figure \ref{fig:histogram}.
 
 $$s^2 = \sum_{i=1}^n (x_i-\bar{x})^2$$
+<<<<<<< HEAD
 
 # Batman is angry
 
 ## Why?
 
 He does not like statistical formulas.
+=======
+```{r}
+library(tidyverse)
+data <- read_csv(here::here("worldwidecases.csv"))
+```
+>>>>>>> 7561dc23f739f49778f627b80e02b9a5f50fc577
