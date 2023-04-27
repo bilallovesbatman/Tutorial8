@@ -47,3 +47,8 @@ Consider the logNormal data plotted in Figure \ref{fig:histogram}.
 
 $$s^2 = \sum_{i=1}^n (x_i-\bar{x})^2$$
 
+# Batman is angry
+
+## Why?
+
+He does not like statistical formulas.
