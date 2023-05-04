@@ -1,0 +1,292 @@
+---
+title: "How change in cash rate affect other economic factors in Australia?"
+author:
+- familyname: Do
+  othernames: Hoang
+  address: Monash University
+  qualifications: ETC5513 - Collaborative and reproducible practices
+- familyname: here 
+  othernames: Your name 
+  address: Monash University
+  qualifications: ETC5513 - Collaborative and reproducible practices
+- familyname: here 
+  othernames: Your name 
+  address: Monash University
+  qualifications: ETC5513 - Collaborative and reproducible practices
+- familyname: here 
+  othernames: Your name 
+  address: Monash University
+  qualifications: ETC5513 - Collaborative and reproducible practices
+- familyname: Srikueakun
+  othernames: Sasiwipha
+  address: Monash University
+  qualifications: ETC5513 - Collaborative and reproducible practices
+email: ssri0048@student.monash.edu
+department: Department of\newline Econometrics &\newline Business Statistics
+organization: Assignment 2
+bibliography: references.bib
+biblio-style: authoryear-comp
+linestretch: 1.5
+output:
+  monash::report:
+    fig_caption: yes
+    fig_height: 5
+    fig_width: 8
+    includes:
+      in_header: preamble.tex
+    keep_tex: yes
+    number_sections: yes
+    citation_package: biblatex
+    toc: false
+    extra_dependencies: ["float"]
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, cache=TRUE, messages=FALSE, warning=FALSE)
+knitr::opts_chunk$set(fig.pos = "H", out.extra = "")
+```
+
+```{r, warning=F, message= F, include=F}
+library(tidyverse)
+library(lubridate)
+library(knitr)
+library(zoo)
+library(kableExtra)
+library(broom)
+```
+
+
+
+# Unemployment rate analysis
+```{r, include=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(lubridate)
+library(here)
+library(readxl)
+library(zoo)
+library(tibble)
+library(knitr)
+library(tidyr)
+library(broom)
+library(kableExtra)
+```
+
+```{r, include=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+### import data from
+cash_rates <- read_excel(here::here("raw data/Cash rates.xls"), skip =1)
+
+# Select variables and rows, and rename
+cash_rates <- cash_rates[-c(1:9),] %>% 
+  select(Title,
+         'Cash Rate Target') %>%
+  rename(Cash_rates = 'Cash Rate Target')
+
+# Format the date to day-month-year
+cash_rates$Title <- as.Date(as.numeric(cash_rates$Title), origin = "1899-12-30")
+cash_rates <- cash_rates %>%
+  mutate(Date = as.Date(Title, format = "%Y-%m-%d")) %>%
+  select(Date, Cash_rates)
+
+#Rounding cash rates
+cash_rates$Cash_rates <- as.numeric(as.character(cash_rates$Cash_rates))
+cash_rates$Cash_rates <- round(cash_rates$Cash_rates, 2) 
+
+#Remove NA
+cash_rates <- cash_rates %>%
+  na.omit()
+
+#Filter period from 2013 to 2023 and group by year month
+cash_rates <- cash_rates %>% 
+  mutate(yearmonth = format(as.Date(Date), "%Y-%m")) %>%
+  group_by(yearmonth) %>%
+  filter(Date > as.Date("2013-01-01")) %>%
+  filter(Date == max(Date)) %>% 
+  select(yearmonth, Cash_rates) 
+```
+
+```{r, include=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+unemployment <- read_excel(here::here("raw data/Employment.xlsx"), sheet =2) 
+
+# Select variables and rows, and rename
+unemployment <- unemployment %>% 
+  select(...1,
+        "Unemployment rate ;  Persons ;...66") %>%
+  rename(Unemployment_rate = "Unemployment rate ;  Persons ;...66")
+unemployment <- unemployment[-c(1:9), ]
+
+# Format the date to day-month-year
+unemployment$...1 <- as.Date(as.numeric(unemployment$...1), origin = "1899-12-30")
+unemployment <- unemployment %>%
+  mutate(Date = as.Date(...1, format = "%Y-%m-%d")) %>%
+  select(Date, Unemployment_rate)
+
+#Rounding rates
+unemployment$Unemployment_rate <- as.numeric(unemployment$Unemployment_rate)
+unemployment$Unemployment_rate <- round(unemployment$Unemployment_rate, 3) 
+
+#Filter period from 2013 to 2023 and group by year month
+unemployment <- unemployment %>% 
+  mutate(yearmonth = format(as.Date(Date), "%Y-%m")) %>%
+  group_by(yearmonth) %>%
+  filter(Date >= as.Date("2013-01-01")) %>%
+  select(yearmonth, Unemployment_rate) 
+```
+
+## Executive Summary
+  This study uses a linear regression model and correlation analysis to examine the relationship between cash rates and unemployment in Australia from 2013 to 2023. The analysis reveals a trade-off between these two macroeconomic indicators, with the government closely monitoring employment levels. It can be seen clearly during the beginning of the Covid-19 pandemic in 2019-2020. There was a significant increase in the unemployment rate while the cash rate decreased conversely. This study can confirm the well-known trade-off relationship between cash rates and unemployment; further research is required to understand the factors influencing unemployment rates in the country. Exploring other economic indicators and conducting more complex statistical analyses could provide a better understanding of the relationships between these variables.
+
+## Introduction
+  This study evaluates the impact of cash rate changes on Australia's unemployment rates. The motivation behind this research is that these two macroeconomic indicators are crucial for policymakers to achieve economic growth and stability targets in the critical role that cash rate changes and unemployment rates play in shaping the Australian economy. Understanding the relationship between these indicators can inform the development of effective policies and strategies to manage the Australian economy. Data from 2013 to 2023 will present the result, covering and reflecting economic challenges such as the COVID-19 pandemic. Moreover, The findings will help people understand the correlation between two variables among operations in the Australian economy.
+ 
+## Data set introduction 
+  This study uses two data sets are the "cash_rates" data set, which was retrieved from [The Reserve Bank of Australia (RBA)](https://www.rba.gov.au/statistics/cash-rate/) 
+  and the "unemployment" data set, which was retrieved from [Australian Bureau of Statistics (ABS)](https://www.abs.gov.au/statistics/labour/employment-and-unemployment/labour-force-australia/latest-release). These data sets covering the period between 2013 and 2023. 
+
+### The "cash_rates" data set has `r nrow(cash_rates)` observations and `r ncol(cash_rates)`  variables, which are shown in the table \@ref(tab:tabcash).
+
+```{r tabcash, include=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.width=15, fig.height=9, fig.align='center'}
+kable(head(cash_rates), 
+      caption = "Head of Cash rates data set")
+```
+
+### The "unemployment" data set has `r nrow(unemployment)` observations and `r ncol(unemployment)` variables, which are shown in the table \@ref(tab:tabun) .
+```{r tabun, include=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.align='center'}
+kable(head(unemployment), 
+      caption = "Head of unemployment data set")
+```
+
+>
+
+## Unemployment Rate Analysis
+### Methodology
+   In this analysis, we will investigate the correlation between cash rates and average unemployment rates in Australia from the year 2013 to 2023. The methodology used in this analysis involves using a linear regression model and correlation analysis to assess the relationship between these factors. The scatter plot and line graph will be provided to visualize these two indicators' relationship and the trends across this period. 
+
+
+```{r, include=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+# Convert monthly unemployment rate to average quarterly unemployment rate
+unemployment_quarterly <- unemployment %>%
+  mutate(Quarter = as.Date(as.yearqtr(yearmonth, format = "%Y-%m"))) %>%
+  group_by(Quarter) %>%
+  summarise(Avg_Unemployment_rate = mean(Unemployment_rate)) %>%
+  mutate(Quarter = format(as.Date(Quarter), "%Y-%m"))
+```
+
+```{r, include=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+# Merge cash rates, inflation rate, and average quarterly unemployment rate
+combine_data <- cash_rates %>%
+  inner_join(unemployment_quarterly, by = c("yearmonth" = "Quarter")) %>%
+  mutate(Quarter = as.Date(paste0(yearmonth, "-01"), format = "%Y-%m-%d"))
+
+combine_data <- combine_data %>%
+  select(Quarter, Cash_rates, Avg_Unemployment_rate)  
+```
+
+### Linear Regression Analysis
+  The linear regression method will be used to analyze the relationship between  "Cash_rates and "Unemployment_rate". That means we will try to predict Unemployment_rate based on Cash_rates by using the lm function in R as shown the calculation result in the table \@ref(tab:linear) . 
+
+```{r, eval=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+linear_analysis <- lm(Avg_Unemployment_rate ~ Cash_rates, data = combine_data)
+summary(linear_analysis)
+```
+
+```{r linear, include=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.width=15, fig.height=9, fig.align='center'}
+linear_analysis <- lm(Avg_Unemployment_rate ~ Cash_rates, data = combine_data)
+kable(summary(linear_analysis)$coefficients, digits = 4, 
+      caption = "Linear Regression Results")
+```
+>
+
+### Correlation analysis
+  The correlation coefficient method will be used to measure, as we can see from the table \@ref(tab:corre), the association level between Cash_rates and Unemployment_rate. Its value ranges between -1 (perfect negative correlation: when x increases, y decreases) and +1 (perfect positive correlation: when x increases, y increases).
+
+```{r corre, include=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+correlation <- cor(combine_data$Cash_rates, combine_data$Avg_Unemployment_rate)
+kable(correlation, digits = 8, 
+      caption = "Correlation between Cash Rates and Unemployment Rate")
+```
+
+### Trend of Cash Rates and Unemployment Rate in Australia (2013-2023)
+  The line graph from the figure \@ref(fig:trend) displays the changes in cash rates and average unemployment rates in Australia from 2013 to 2023. 
+
+```{r trend, include=TRUE, echo=FALSE, message=FALSE, warning=FALSE,fig.cap="Cash Rate and Unemployment rate over Time", fig.width=7, fig.height=4 }
+# Plot line chart of unemployment rate over time
+ggplot(combine_data, aes(x=Quarter)) +
+  geom_line(aes(y=Cash_rates, color="Cash Rates")) +
+  geom_line(aes(y=Avg_Unemployment_rate, color="Unemployment Rate")) +
+  labs(color="Indicator", x="Year-Quarter", y= "Rate in Percentage") +
+  scale_color_manual(values=c("Cash Rates"="blue", "Unemployment Rate"="red")) +
+  ggtitle("Cash Rate and Unemployment Rate in Australia (2013-2023)")
+
+```
+
+### Results
+* According to the result from the table \@ref(tab:linear), linear regression model suggests that the expected unemployment rate is 5.35668 when cash rate is 0 and increases by 0.05452 for every unit increase in cash rate. However, the cash rate variable is not significant in predicting unemployment rate as p-value > 0.05.
+* Furthermore, The scatter plot from the figure \@ref(fig:scatter) shows a weak positive correlation between cash rates and unemployment rates, indicating that there is no significant linear relationship between these two variables in Australia from 2013 to 2023.
+  
+```{r scatter, include=TRUE, echo=FALSE, message=FALSE, warning=FALSE,fig.cap="Scatter plot of Cash Rates and Unemployment Rate in Australia", fig.width=6, fig.height=4, fig.align='center'}
+ggplot(combine_data, aes(x=Cash_rates, y=Avg_Unemployment_rate)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x="Cash Rates", y="Unemployment Rate", 
+       title="Scatter plot of Cash Rates and Unemployment Rate in Australia")
+```
+
+* The correlation analysis of the cash rate and the unemployment rate from table \@ref(tab:corre), indicates a weak positive correlation coefficient between these two variables by 0.06041871.  This means that as the cash rate increases, there is a slight tendency for the expected unemployment rate to increase. 
+* Finally, The line graph from figure \@ref(fig:trend) suggests an inverse relationship between cash and unemployment rates in Australia from 2013 to 2023. As the cash rate decreases, unemployment tends to increase, and conversely. The trend of cash rates is relatively stable, while the unemployment rate trend appears more unstable.
+
+   
+## Discussion and Recommendations
+   In conclusion, the relationship between cash rates and unemployment in Australia suggests a trade-off, with can predict that the government is closely monitoring employment as a reliable indicator of the economy's performance. If unemployment increases, the RBA may lower interest rates to boost spending, encouraging borrowing and spending to stimulate economic growth and create new job opportunities. 
+  Moreiver, the analysis confirms the trade-off between cash rates and unemployment. However, correlation alone is insufficient to draw definitive conclusions about their relationship. It is important to note that correlation does not imply causation, and further analysis is required to establish causal relationships between the two variables.
+  The recommendation is that further research is needed to understand the factors influencing unemployment rates in Australia altogether. While linear regression and correlation analyses provide some insights, exploring other economic indicators, such as inflation rates, GDP growth, and industry-specific data, and conducting more complex statistical analyses to model the relationships between these variables would be necessary.
+
+
+## Methodology
+
+### Summary Statistics of Unemployment rate and Cash rate
+
+### Unemployment rate and Cash rate trend lines
+
+
+### Scatterplot of Unemployment rate and Cash rate
+
+### Linear model
+
+## Results
+
+## Discussion and Recommendations
+
+# Stock index value (ASX-200) analysis
+## Methodology
+
+### Summary Statistics of Stock index and Cash rate
+
+### Stock index and Cash rate trend lines
+
+### Scatterplot of Stock index and Cash rate
+
+### Linear model
+
+## Results
+
+## Discussion and Recommendations
+
+# Property price index growth analysis
+## Methodology
+
+### Summary Statistics of Property price index and Cash rate
+
+### Property price index and Cash rate trend lines
+
+### Scatterplot of Property price index and Cash rate
+
+### Linear model
+
+## Results
+
+## Discussion and Recommendations
+
+# Conclusion
+
+# References
+testing...
