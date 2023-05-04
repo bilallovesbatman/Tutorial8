@@ -1,0 +1,611 @@
+---
+title: "How change in cash rate affect other economic factors in Australia?"
+author:
+- familyname: Do
+  othernames: Hoang
+  address: Monash University
+  qualifications: ETC5513 - Collaborative and reproducible practices
+- familyname: here 
+  othernames: Your name 
+  address: Monash University
+  qualifications: ETC5513 - Collaborative and reproducible practices
+- familyname: here 
+  othernames: Your name 
+  address: Monash University
+  qualifications: ETC5513 - Collaborative and reproducible practices
+- familyname: Srikueakun 
+  othernames: Sasiwipha 
+  address: Monash University
+  qualifications: ETC5513 - Collaborative and reproducible practices
+- familyname: Zhang
+  othernames: Zhang
+  address: Monash University
+  qualifications: ETC5513 - Collaborative and reproducible practices
+email: vdoo0002@student.monash.edu, ssri0048@student.monash.edu
+department: Department of\newline Econometrics &\newline Business Statistics
+organization: Assignment 2
+bibliography: references.bib
+biblio-style: authoryear-comp
+linestretch: 1.5
+output:
+  monash::report:
+    fig_caption: yes
+    fig_height: 5
+    fig_width: 8
+    includes:
+      in_header: preamble.tex
+    keep_tex: yes
+    number_sections: yes
+    citation_package: biblatex
+    toc: false
+    extra_dependencies: ["float"]
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, cache=TRUE, messages=FALSE, warning=FALSE)
+knitr::opts_chunk$set(fig.pos = "H", out.extra = "")
+```
+
+```{r, warning=F, message= F, include=F}
+library(tidyverse)
+library(lubridate)
+library(knitr)
+library(zoo)
+library(kableExtra)
+library(broom)
+library(hrbrthemes)
+library(readxl)
+```
+
+# Data outlook
+Below is the first 5 observations of the data we will use for the analysis.
+```{r, warning=F, message= F}
+# Import data for inflation and cash rate
+data <- read_csv(here::here("final_data.csv")) %>% 
+  select(yearmonth, 
+         Cash_rates,
+         inflation_rate)
+```
+
+```{r, warning=F, message= F}
+# Import full data
+full_data_one <- read_csv(here::here("final_data.csv")) %>%
+  select(yearmonth, 
+         Cash_rates, 
+         GDP_level_b, 
+         quarterly_growth, 
+         ave_quarter_property_price_index_growth) 
+
+full_data_two <- read_csv(here::here("final_data.csv")) %>%
+  select(yearmonth, 
+         Unemployment_rate,                      
+         Index_value, 
+         inflation_rate) 
+
+head_data_one <- head(full_data_one, n = 5)
+head_data_two <- head(full_data_two, n = 5)
+
+# Rename column labels
+colnames(head_data_one) <- c("Date", "Cash Rates", "GDP level $b", "GDP quarterly growth", "Average quarter property growth")
+colnames(head_data_two) <- c("Date", "Unemployment rate", "ASX-200 Index value", "Inflation Rate")
+
+# Output data frame as formatted table
+kable(head_data_one, booktabs = TRUE, col.names = colnames(head_data_one))
+kable(head_data_two, booktabs = TRUE, col.names = colnames(head_data_two))
+```
+
+# Executive Summary
+The main aim of this report is to investigate how change in cash rate affect other economic factors (inflation, GDP, unemployment rate, property price growth, stock index value) in Australia. By using the data for a period of 10 year, from 2013 to 2023, the overall trend will be analysed which combined with linear model, and thus conclude the strength of the relationship between these 2 significantly important economic factors. Our findings suggest that ..........
+
+# Introduction
+In a recent year, high inflation has become a hot topic all around the world, especially for developed economy like the US, the Europe or Australia. This happens due to a long period of expansionary monetary policy to deal with the impact of the Covid-19 pandemic on the economy. In Australia, the Reserve Bank of Australia (RBA) use cash rate – The interest rate which banks pay to borrow funds from other banks in the money market on an overnight basis to implement monetary policy. This report will dive into the historical data of a decade to have a big picture of the relationship between these 2 factors. 
+
+# Inflation rate analysis
+## Methodology
+From the Reserve Bank of Australia, we gathered data on cash rates and inflation rates over the last 10 years. To ascertain the link between the two variables, we used a linear regression model to analyse the data. To better understand the trends and visualise the data, we also made a scatter plot and trend line plot. The two variables' summary statistics are displayed in the table below.
+
+### Summary Statistics of Inflation rate and Cash rate
+
+```{r CashRatesVSInflation, message=FALSE, warning=FALSE}
+stat_summary <- rbind(summary(data$inflation_rate),summary(data$Cash_rates))
+rownames(stat_summary) <- c("Inflation Rates", "Cash Rates")
+kable(stat_summary, booktabs = TRUE, caption = "Summary Statistics of Inflation and Cash Rate")
+```
+
+### Inflation rate and Cash rate trend lines
+
+```{r pllines, fig.cap="Inflation rate and Cash rate trend lines", fig.height= 4, fig.width = 5,fig.align='center', message=FALSE, warning=FALSE}
+#data modification
+data <- data[-c(1:2), ]
+data$yearmonth <- as.Date(paste0(data$yearmonth, "-01"))
+data$inflation_rate <- na.locf(data$inflation_rate)
+#plot
+ggplot(data, aes(x=yearmonth)) +
+  geom_line(aes(y=Cash_rates, color="Cash rates")) +
+  geom_line(aes(y=inflation_rate, color="Inflation rate")) +
+  scale_color_manual(values = c("blue", "red")) +
+  labs(title = "Cash rates and Inflation rate over time",
+       x = "Year",
+       y = "Rate") +
+  theme_bw()
+```
+
+### Scatterplot of Cash rate and Inflation rate
+
+```{r scatterplot, fig.cap="Scatterplot of Cash rate and Inflation rate", fig.align='center', fig.height= 4, fig.width = 5, message=FALSE, warning=FALSE}
+ggplot(data, aes(x = Cash_rates, y = inflation_rate)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(title = "Cash rate and Inflation rate scatterplot",
+       x = "Cash Rate",
+       y = "Inflation Rate") +
+  theme_bw()
+```
+
+### Linear model
+
+```{r Linear Model, echo = F}
+lm_mod <- lm(inflation_rate ~ Cash_rates, data = data)
+lm_summary <- tidy(lm_mod)
+kable(lm_summary[, c("term", "estimate", "std.error", "statistic", "p.value")],  booktabs = TRUE, digits = c(0, 2, 2, 2, 4), align = "c")
+```
+
+
+## Results
+As shown in Table \ref{tab:CashRatesVSInflation}, most of the statistic factors are the same between 2 rates. However, there are 2 noticeable figures, max and NA values. 
+
+* Maximum value of inflation rate is **much higher** than that of cash rate, which implies that the inflation rate increases **faster** and **before** the cash rate. This is supported by the plot of cash rate and inflation rate over time (Figure \ref{fig:pllines}).
+* Another noticeable figure is that inflation rate has a lot of missing values. This is explainable since data for inflation rate is collected quarterly while cash rate data is collected monthly. And for convenience, missing values for inflation rate will be replaced by the nearest non-missing value prior to that month.
+* Moreover, in overall, Figure \ref{fig:pllines} shows that the trend of inflation rate and cash rate shows a *synchronization* over time. 
+
+The scatterplot (Figure \ref{fig:scatterplot}) indicates a positive, moderate correlation between cash rate and inflation rates in Australia, with **outliers**. 
+
+The linear regression model shows that a one-point increase in cash rate leads to a 0.55 point increase in inflation rate, holding all other factors constant. Moreover, the p-value is 0.000234 indicates that cash rate is a **significant** variable in predicting inflation rate at 5% level of significance.
+
+## Discussion and Recommendations
+Our findings suggest that changes in cash rate have a positive relationship on inflation rate in Australia. However, in practical situation, the relationship between this 2 factors is usually negative, which means that if the cash rate decreases, more money will be pumped into the economy, which boosts spending and investing factor, and thus increase the inflation rate. And when the inflation rate starts to break out of the target range set by RBA, which is 2-3%, the RBA will implement contractionary monetary policy by decreasing the cash rate. Also, it is noted that there will be a lag for change in cash rate to affect inflation rate. In conclusion, policymakers should take this relationship into account when setting cash rate, and investors should consider the impact of changes in cash rate on the economy when making investment decisions.
+
+# GDP analysis
+## Methodology
+
+### Summary Statistics of GDP and Cash rate
+
+### GDP and Cash rate trend lines
+
+### Scatterplot of GDP and Cash rate 
+
+### Linear model
+
+## Results
+
+## Discussion and Recommendations
+
+# Unemployment rate analysis
+<<<<<<< HEAD
+```{r, include=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(lubridate)
+library(here)
+library(readxl)
+library(zoo)
+library(tibble)
+library(knitr)
+library(tidyr)
+library(broom)
+library(kableExtra)
+```
+
+```{r, include=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+### import data from
+cash_rates <- read_excel(here::here("raw data/Cash rates.xls"), skip =1)
+
+# Select variables and rows, and rename
+cash_rates <- cash_rates[-c(1:9),] %>% 
+  select(Title,
+         'Cash Rate Target') %>%
+  rename(Cash_rates = 'Cash Rate Target')
+
+# Format the date to day-month-year
+cash_rates$Title <- as.Date(as.numeric(cash_rates$Title), origin = "1899-12-30")
+cash_rates <- cash_rates %>%
+  mutate(Date = as.Date(Title, format = "%Y-%m-%d")) %>%
+  select(Date, Cash_rates)
+
+#Rounding cash rates
+cash_rates$Cash_rates <- as.numeric(as.character(cash_rates$Cash_rates))
+cash_rates$Cash_rates <- round(cash_rates$Cash_rates, 2) 
+
+#Remove NA
+cash_rates <- cash_rates %>%
+  na.omit()
+
+#Filter period from 2013 to 2023 and group by year month
+cash_rates <- cash_rates %>% 
+  mutate(yearmonth = format(as.Date(Date), "%Y-%m")) %>%
+  group_by(yearmonth) %>%
+  filter(Date > as.Date("2013-01-01")) %>%
+  filter(Date == max(Date)) %>% 
+  select(yearmonth, Cash_rates) 
+```
+
+```{r, include=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+unemployment <- read_excel(here::here("raw data/Employment.xlsx"), sheet =2) 
+
+# Select variables and rows, and rename
+unemployment <- unemployment %>% 
+  select(...1,
+        "Unemployment rate ;  Persons ;...66") %>%
+  rename(Unemployment_rate = "Unemployment rate ;  Persons ;...66")
+unemployment <- unemployment[-c(1:9), ]
+
+# Format the date to day-month-year
+unemployment$...1 <- as.Date(as.numeric(unemployment$...1), origin = "1899-12-30")
+unemployment <- unemployment %>%
+  mutate(Date = as.Date(...1, format = "%Y-%m-%d")) %>%
+  select(Date, Unemployment_rate)
+
+#Rounding rates
+unemployment$Unemployment_rate <- as.numeric(unemployment$Unemployment_rate)
+unemployment$Unemployment_rate <- round(unemployment$Unemployment_rate, 3) 
+
+#Filter period from 2013 to 2023 and group by year month
+unemployment <- unemployment %>% 
+  mutate(yearmonth = format(as.Date(Date), "%Y-%m")) %>%
+  group_by(yearmonth) %>%
+  filter(Date >= as.Date("2013-01-01")) %>%
+  select(yearmonth, Unemployment_rate) 
+```
+
+## Executive Summary
+  This study uses a linear regression model and correlation analysis to examine the relationship between cash rates and unemployment in Australia from 2013 to 2023. The analysis reveals a trade-off between these two macroeconomic indicators, with the government closely monitoring employment levels. It can be seen clearly during the beginning of the Covid-19 pandemic in 2019-2020. There was a significant increase in the unemployment rate while the cash rate decreased conversely. This study can confirm the well-known trade-off relationship between cash rates and unemployment; further research is required to understand the factors influencing unemployment rates in the country. Exploring other economic indicators and conducting more complex statistical analyses could provide a better understanding of the relationships between these variables.
+
+## Introduction
+  This study evaluates the impact of cash rate changes on Australia's unemployment rates. The motivation behind this research is that these two macroeconomic indicators are crucial for policymakers to achieve economic growth and stability targets in the critical role that cash rate changes and unemployment rates play in shaping the Australian economy. Understanding the relationship between these indicators can inform the development of effective policies and strategies to manage the Australian economy. Data from 2013 to 2023 will present the result, covering and reflecting economic challenges such as the COVID-19 pandemic. Moreover, The findings will help people understand the correlation between two variables among operations in the Australian economy.
+ 
+## Data set introduction 
+  This study uses two data sets are the "cash_rates" data set, which was retrieved from [The Reserve Bank of Australia (RBA)](https://www.rba.gov.au/statistics/cash-rate/) 
+  and the "unemployment" data set, which was retrieved from [Australian Bureau of Statistics (ABS)](https://www.abs.gov.au/statistics/labour/employment-and-unemployment/labour-force-australia/latest-release). These data sets covering the period between 2013 and 2023. 
+
+### The "cash_rates" data set has `r nrow(cash_rates)` observations and `r ncol(cash_rates)`  variables, which are shown in the table \@ref(tab:tabcash).
+
+```{r tabcash, include=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.width=15, fig.height=9, fig.align='center'}
+kable(head(cash_rates), 
+      caption = "Head of Cash rates data set")
+```
+
+### The "unemployment" data set has `r nrow(unemployment)` observations and `r ncol(unemployment)` variables, which are shown in the table \@ref(tab:tabun) .
+```{r tabun, include=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.align='center'}
+kable(head(unemployment), 
+      caption = "Head of unemployment data set")
+```
+
+>
+
+## Analysis
+### Methodology
+   In this analysis, we will investigate the correlation between cash rates and average unemployment rates in Australia from the year 2013 to 2023. The methodology used in this analysis involves using a linear regression model and correlation analysis to assess the relationship between these factors. The scatter plot and line graph will be provided to visualize these two indicators' relationship and the trends across this period. 
+
+
+```{r, include=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+# Convert monthly unemployment rate to average quarterly unemployment rate
+unemployment_quarterly <- unemployment %>%
+  mutate(Quarter = as.Date(as.yearqtr(yearmonth, format = "%Y-%m"))) %>%
+  group_by(Quarter) %>%
+  summarise(Avg_Unemployment_rate = mean(Unemployment_rate)) %>%
+  mutate(Quarter = format(as.Date(Quarter), "%Y-%m"))
+```
+
+```{r, include=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+# Merge cash rates, inflation rate, and average quarterly unemployment rate
+combine_data <- cash_rates %>%
+  inner_join(unemployment_quarterly, by = c("yearmonth" = "Quarter")) %>%
+  mutate(Quarter = as.Date(paste0(yearmonth, "-01"), format = "%Y-%m-%d"))
+
+combine_data <- combine_data %>%
+  select(Quarter, Cash_rates, Avg_Unemployment_rate)  
+```
+
+### Linear Regression Analysis
+  The linear regression method will be used to analyze the relationship between  "Cash_rates and "Unemployment_rate". That means we will try to predict Unemployment_rate based on Cash_rates by using the lm function in R as shown the calculation result in the table \@ref(tab:linear) . 
+
+```{r, eval=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+linear_analysis <- lm(Avg_Unemployment_rate ~ Cash_rates, data = combine_data)
+summary(linear_analysis)
+```
+
+```{r linear, include=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.width=15, fig.height=9, fig.align='center'}
+linear_analysis <- lm(Avg_Unemployment_rate ~ Cash_rates, data = combine_data)
+kable(summary(linear_analysis)$coefficients, digits = 4, 
+      caption = "Linear Regression Results")
+```
+>
+
+### Correlation analysis
+  The correlation coefficient method will be used to measure, as we can see from the table \@ref(tab:corre), the association level between Cash_rates and Unemployment_rate. Its value ranges between -1 (perfect negative correlation: when x increases, y decreases) and +1 (perfect positive correlation: when x increases, y increases).
+
+```{r corre, include=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+correlation <- cor(combine_data$Cash_rates, combine_data$Avg_Unemployment_rate)
+kable(correlation, digits = 8, 
+      caption = "Correlation between Cash Rates and Unemployment Rate")
+```
+
+### Trend of Cash Rates and Unemployment Rate in Australia (2013-2023)
+  The line graph from the figure \@ref(fig:trend) displays the changes in cash rates and average unemployment rates in Australia from 2013 to 2023. 
+
+```{r trend, include=TRUE, echo=FALSE, message=FALSE, warning=FALSE,fig.cap="Cash Rate and Unemployment rate over Time", fig.width=7, fig.height=4 }
+# Plot line chart of unemployment rate over time
+ggplot(combine_data, aes(x=Quarter)) +
+  geom_line(aes(y=Cash_rates, color="Cash Rates")) +
+  geom_line(aes(y=Avg_Unemployment_rate, color="Unemployment Rate")) +
+  labs(color="Indicator", x="Year-Quarter", y= "Rate in Percentage") +
+  scale_color_manual(values=c("Cash Rates"="blue", "Unemployment Rate"="red")) +
+  ggtitle("Cash Rate and Unemployment Rate in Australia (2013-2023)")
+
+```
+
+### Results
+* According to the result from the table \@ref(tab:linear), linear regression model suggests that the expected unemployment rate is 5.35668 when cash rate is 0 and increases by 0.05452 for every unit increase in cash rate. However, the cash rate variable is not significant in predicting unemployment rate as p-value > 0.05.
+* Furthermore, The scatter plot from the figure \@ref(fig:scatter) shows a weak positive correlation between cash rates and unemployment rates, indicating that there is no significant linear relationship between these two variables in Australia from 2013 to 2023.
+  
+```{r scatter, include=TRUE, echo=FALSE, message=FALSE, warning=FALSE,fig.cap="Scatter plot of Cash Rates and Unemployment Rate in Australia", fig.width=6, fig.height=4, fig.align='center'}
+ggplot(combine_data, aes(x=Cash_rates, y=Avg_Unemployment_rate)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x="Cash Rates", y="Unemployment Rate", 
+       title="Scatter plot of Cash Rates and Unemployment Rate in Australia")
+```
+
+* The correlation analysis of the cash rate and the unemployment rate from table \@ref(tab:corre), indicates a weak positive correlation coefficient between these two variables by 0.06041871.  This means that as the cash rate increases, there is a slight tendency for the expected unemployment rate to increase. 
+* Finally, The line graph from figure \@ref(fig:trend) suggests an inverse relationship between cash and unemployment rates in Australia from 2013 to 2023. As the cash rate decreases, unemployment tends to increase, and conversely. The trend of cash rates is relatively stable, while the unemployment rate trend appears more unstable.
+
+   
+## Discussion and Recommendations
+   In conclusion, the relationship between cash rates and unemployment in Australia suggests a trade-off, with can predict that the government is closely monitoring employment as a reliable indicator of the economy's performance. If unemployment increases, the RBA may lower interest rates to boost spending, encouraging borrowing and spending to stimulate economic growth and create new job opportunities. 
+  Moreiver, the analysis confirms the trade-off between cash rates and unemployment. However, correlation alone is insufficient to draw definitive conclusions about their relationship. It is important to note that correlation does not imply causation, and further analysis is required to establish causal relationships between the two variables.
+  The recommendation is that further research is needed to understand the factors influencing unemployment rates in Australia altogether. While linear regression and correlation analyses provide some insights, exploring other economic indicators, such as inflation rates, GDP growth, and industry-specific data, and conducting more complex statistical analyses to model the relationships between these variables would be necessary.
+
+
+=======
+## Methodology
+
+### Summary Statistics of Unemployment rate and Cash rate
+
+### Unemployment rate and Cash rate trend lines
+
+### Scatterplot of Unemployment rate and Cash rate
+
+### Linear model
+
+## Results
+
+## Discussion and Recommendations
+>>>>>>> main
+
+# Stock index value (ASX-200) analysis
+## Methodology
+
+### Summary Statistics of Stock index and Cash rate
+
+### Stock index and Cash rate trend lines
+
+### Scatterplot of Stock index and Cash rate
+
+### Linear model
+
+## Results
+
+## Discussion and Recommendations
+
+# Property price index growth analysis
+<<<<<<< HEAD
+## Methodology
+
+### Summary Statistics of Property price index and Cash rate
+
+### Property price index and Cash rate trend lines
+
+### Scatterplot of Property price index and Cash rate
+
+### Linear model
+
+## Results
+
+## Discussion and Recommendations
+=======
+
+## Methodology
+
+To better understand the relationship between cash rates and house prices, we gathered data on cash rates (from 01/2013 to 04/2023) and house prices (from 01/2013 to 12/2021) from the Australian Bureau of Statistics (ABS). Following a thorough data cleaning process, we conducted an in-depth analysis of the association between cash rate and house price index by examining trends, correlation coefficients, and linear regression models. The findings of our analysis are detailed below.
+
+### Summary Statistics of Property price index and Cash rate
+
+```{r}
+cash_rates <- read_excel(here::here("raw data/Cash rates.xls"), skip =1)
+
+
+cash_rates <- cash_rates[-c(1:9),] %>% 
+  select(Title,
+         'Cash Rate Target') %>%
+  rename(Cash_rates = 'Cash Rate Target')
+
+
+cash_rates$Title <- as.Date(as.numeric(cash_rates$Title), origin = "1899-12-30")
+cash_rates <- cash_rates %>%
+  mutate(Date = as.Date(Title, format = "%Y-%m-%d")) %>%
+  select(Date, Cash_rates)
+
+
+cash_rates$Cash_rates <- as.numeric(as.character(cash_rates$Cash_rates))
+cash_rates$Cash_rates <- round(cash_rates$Cash_rates, 2) 
+
+
+cash_rates <- cash_rates %>%
+  na.omit()
+
+cash_rates <- cash_rates %>% 
+  mutate(yearmonth = format(as.Date(Date), "%Y-%m")) %>%
+  group_by(yearmonth) %>%
+  filter(Date > as.Date("2013-01-01")) %>%
+  filter(Date == max(Date)) %>% 
+  select(yearmonth, Cash_rates) 
+
+```
+
+
+```{r cr}
+
+table_data <- head(cash_rates, 5)
+knitr::kable(table_data, caption = "Cash rate 2013-2023")%>%
+       kableExtra::kable_classic(full_width = FALSE)
+```
+```{r}
+house_price <- read_excel(here::here("raw data/Residential Property Price Index.xlsx"), sheet = 2)
+
+
+house_price <- house_price[-c(1:9),] %>% 
+  select(...1,
+          "Residential Property Price Index percentage change from previous quarter ;  Weighted average of eight capital cities ;") %>%
+  rename(ave_quarter_property_price_index_growth =  "Residential Property Price Index percentage change from previous quarter ;  Weighted average of eight capital cities ;")
+
+
+house_price$...1 <- as.Date(as.numeric(house_price$...1), origin = "1899-12-30")
+house_price <- house_price %>%
+  mutate(Date = as.Date(...1, format = "%Y-%m-%d")) %>%
+  select(Date, ave_quarter_property_price_index_growth)
+
+
+house_price$ave_quarter_property_price_index_growth <- as.numeric(house_price$ave_quarter_property_price_index_growth)
+house_price$ave_quarter_property_price_index_growth <- round(house_price$ave_quarter_property_price_index_growth, 2) 
+
+
+house_price <- house_price %>%
+  na.omit()
+
+
+house_price <- house_price %>% 
+  mutate(yearmonth = format(as.Date(Date), "%Y-%m")) %>%
+  group_by(yearmonth) %>%
+  filter(Date >= as.Date("2013-01-01")) %>%
+  select(yearmonth, ave_quarter_property_price_index_growth) 
+```
+
+
+
+```{r hp}
+
+
+table_data <- head(house_price, 5)
+knitr::kable(table_data, caption = "House price 2013-2023")%>%
+       kableExtra::kable_classic(full_width = FALSE)
+    
+```
+
+```{r crd}
+
+dim_and_dtype <- data.frame(
+  Dimension = dim(cash_rates),
+  DataType = sapply(cash_rates, class))
+
+
+dim_and_dtype %>%
+  kable("html", caption = "Cash rates 2013-2023") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+
+```
+```{r hpd}
+dim_and_dtype <- data.frame(
+  Dimension = dim(house_price),
+  DataType = sapply(house_price, class))
+
+
+dim_and_dtype %>%
+  kable("html", caption = "House price 2013-2021") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+```
+```{r comb}
+
+
+housegrowth_cash_rate <- inner_join(cash_rates, house_price, by = "yearmonth")%>%
+  rename(Growth_rate = ave_quarter_property_price_index_growth)%>%
+  rename(Quarter = yearmonth)%>%
+  rename(Houseprice_growth = Growth_rate)%>%
+  mutate(Quarter = as.Date(as.yearqtr(Quarter, format = "%Y-%m")))
+
+table_data <- head(housegrowth_cash_rate, 5)
+knitr::kable(table_data, caption = "House price v.s Cash rates 2013-2021")%>%
+       kableExtra::kable_classic(full_width = FALSE)
+```
+The data 'cash_rates' can be retrieved from [Here](https://www.rba.gov.au/statistics/cash-rate/).
+
+As we can see from table \@ref(tab:cr), 'cash_rates' shows the cash rates in AU between 01/2013-04/2023.
+
+The dataset 'cash_rate' displays monthly RBA cash rate between 01/2013 and 04/2023.
+
+Table \@ref(tab:crd) shows that 'cash_rates' has 124 observations and 2 variables. The variables 'yearmonth' is characters, while 'cash_rates' is numeric.
+
+This data has not any missing values. 
+
+The data can be retrieved from [Here](https://www.abs.gov.au/statistics/economy/price-indexes-and-inflation/residential-property-price-indexes-eight-capital-cities/latest-release#data-downloads).
+
+As we can see from table \@ref(tab:hp) 'house_price'shows the quarterly groth rate of house price in AU between 01/2013-12/2021.
+
+The dataset 'house_price' displays average quarterly growth rate of house price from 01/2013 to 12/2021.
+
+
+Table \@ref(tab:hpd) shows that 'house_price' has 36 observations and 2 variables. The variables 'yearmonth' is character, while 'ave_quarter_property_price_index_growth' is numeric.
+
+This data has not any missing values. 
+
+Table \@ref(tab:comb) displays that the quarterly cash rate from 2013 to 2021 with corresponding house price growth rate.
+
+### Property price index and Cash rate trend lines
+```{r linechart,fig.cap = "House Price Growth vs. Cash Rates (2013-2021)", warning = FALSE}
+library(ggplot2)
+library(hrbrthemes)
+CashrateColor <- "#69b3a2"
+HousepriceColor <- rgb(0.2, 0.6, 0.9, 1)
+
+houseprice_plot <- ggplot(housegrowth_cash_rate, aes(x=Quarter)) +
+  geom_line(aes(y=Cash_rates), size=1, color=CashrateColor) +
+  geom_line(aes(y=Houseprice_growth), size=1, color=HousepriceColor) +
+  scale_y_continuous(name = "Cash Rates",
+    sec.axis = sec_axis(~., name="House Price Growth")) +
+  theme_ipsum() +
+  theme(axis.title.y = element_text(color = CashrateColor, size=18, hjust=0.3),
+        axis.title.y.right = element_text(color = HousepriceColor, size=18, hjust=0.3),
+        axis.text = element_text(size = 2))
+
+
+houseprice_plot
+
+```
+### Scatterplot of Property price index and Cash rate
+```{r pairwise,fig.cap = "A pairwise plot: Cash rates v.s House price growth", warning = FALSE}
+pairwise<- housegrowth_cash_rate%>% dplyr::select(-Quarter)
+
+GGally::ggpairs(housegrowth_cash_rate[, c(2,3)])
+```
+### Linear model
+```{r}
+lm_model <- lm(Houseprice_growth ~ Cash_rates, data = housegrowth_cash_rate)
+summary(lm_model)
+
+```
+## Results
+As we can see from figure \@ref(fig:linechart),  the growth in house prices tends to shift to opposite direction in response to changes in cash rates. However, when the cash rate remains constant, house price growth exhibits fluctuating patterns.
+
+Upon examining the Figure \@ref(fig:pairwise), it becomes evident that the negative correlation between cash rates and house price growth is relatively weak. Furthermore, the scatterplot fails to demonstrate a distinct linear relationship between these two variables.
+
+Additionally, the linear regression model suggests that there is no statistically significant relationship between cash rates and house price growth in the provided dataset. The p-value for 'Cash_rates' is 0.16441, which is greater than 0.05. Additionally, the F-statistic of 2.019 with a p-value of 0.1644 indicates that the overall fit of the model is not statistically significant at the 5% significance level.
+## Discussion and Recommendations
+The affect of cash rates on house prices could be indirect, or there could be a lag between changes in cash rates and their impact on house prices. 
+
+Other economic factors, such as supply and demand dynamics, changes in consumer confidence, and changes in the overall state of the economy, can also influence house prices. Changes in lending standards or borrowing capacity could also affect the housing market, and should be considered when analyzing the relationship between cash rates and house prices. 
+
+It is possible that the linear regression model did not capture all of these factors, which could explain why the relationship between 'Cash_rates' and 'Houseprice_growth' was not found to be statistically significant.
+>>>>>>> main
+
+# Conclusion
+
+# References
+testing...

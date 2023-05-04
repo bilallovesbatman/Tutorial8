@@ -1,0 +1,172 @@
+---
+title: "Raw Data Processing"
+output: html_document
+date: '2023-04-28'
+---
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(here)
+library(readxl)
+library(dplyr)
+```
+
+# Process Cash rates data
+```{r}
+cash_rates <- read_excel(here::here("raw data/Cash rates.xls"), skip =1)
+
+# Select variables and rows, and rename
+cash_rates <- cash_rates[-c(1:9),] %>% 
+  select(Title,
+         'Cash Rate Target') %>%
+  rename(Cash_rates = 'Cash Rate Target')
+
+# Format the date to day-month-year
+cash_rates$Title <- as.Date(as.numeric(cash_rates$Title), origin = "1899-12-30")
+cash_rates <- cash_rates %>%
+  mutate(Date = as.Date(Title, format = "%Y-%m-%d")) %>%
+  select(Date, Cash_rates)
+
+#Rounding cash rates
+cash_rates$Cash_rates <- as.numeric(as.character(cash_rates$Cash_rates))
+cash_rates$Cash_rates <- round(cash_rates$Cash_rates, 2) 
+
+#Remove NA
+cash_rates <- cash_rates %>%
+  na.omit()
+
+#Filter period from 2013 to 2023 and group by year month
+cash_rates <- cash_rates %>% 
+  mutate(yearmonth = format(as.Date(Date), "%Y-%m")) %>%
+  group_by(yearmonth) %>%
+  filter(Date > as.Date("2013-01-01")) %>%
+  filter(Date == max(Date)) %>% 
+  select(yearmonth, Cash_rates) 
+
+```
+
+# Process inflation data
+```{r}
+inflation <- read_csv(here::here("raw data/Inflation.csv"), skip =1)
+
+# Format the date to day-month-year
+inflation$...1 <- as.Date(paste0("01-", inflation$...1), format = "%d-%b-%y")
+
+# Convert to desired format
+inflation <- inflation %>%
+  rename(inflation_rate = 'Annual change (%)') %>% 
+  mutate(Date = as.Date(...1, format = "%Y-%m-%d")) %>%
+  mutate(yearmonth = format(as.Date(Date), "%Y-%m")) %>%
+  select(yearmonth, inflation_rate)
+```
+
+# Process Employment data
+```{r}
+unemployment <- read_excel(here::here("raw data/Employment.xlsx"), sheet =2) 
+
+# Select variables and rows, and rename
+unemployment <- unemployment %>% 
+  select(...1,
+        "Unemployment rate ;  Persons ;...66") %>%
+  rename(Unemployment_rate = "Unemployment rate ;  Persons ;...66")
+unemployment <- unemployment[-c(1:9), ]
+
+# Format the date to day-month-year
+unemployment$...1 <- as.Date(as.numeric(unemployment$...1), origin = "1899-12-30")
+unemployment <- unemployment %>%
+  mutate(Date = as.Date(...1, format = "%Y-%m-%d")) %>%
+  select(Date, Unemployment_rate)
+
+#Rounding rates
+unemployment$Unemployment_rate <- as.numeric(unemployment$Unemployment_rate)
+unemployment$Unemployment_rate <- round(unemployment$Unemployment_rate, 3) 
+
+#Filter period from 2013 to 2023 and group by year month
+unemployment <- unemployment %>% 
+  mutate(yearmonth = format(as.Date(Date), "%Y-%m")) %>%
+  group_by(yearmonth) %>%
+  filter(Date >= as.Date("2013-01-01")) %>%
+  select(yearmonth, Unemployment_rate) 
+```
+
+# Process Stock Index
+```{r}
+stock_index <- read_csv(here::here("raw data/Stock Index.csv"))
+
+# Select variables and rows, and rename
+stock_index <- stock_index %>% 
+  select(Date,
+        Price) %>%
+  rename(Index_value = Price)
+
+# Format the date to day-month-year and sort dates in ascending order
+stock_index$Date <- mdy(stock_index$Date)
+stock_index <- stock_index %>%
+  mutate(Date = as.Date(Date, format = "%Y-%m-%d")) %>% arrange(Date)
+
+#Filter period from 2013 to 2023 and group by year month
+stock_index <- stock_index %>% 
+  mutate(yearmonth = format(as.Date(Date), "%Y-%m")) %>%
+  select(yearmonth, Index_value) 
+```
+
+# Process GDP data
+```{r}
+GDP <- read_excel(here::here("raw data/GDP.xlsx"), skip = 1)
+
+# Format the date to day-month-year
+GDP$...1 <- as.Date(paste0("01-", GDP$...1), format = "%d-%b-%y")
+
+# Convert to desired format
+GDP <- GDP %>%
+  rename(GDP_level_b = 'Levels (RHS) ($b)',
+         quarterly_growth = 'Quarterly growth (%)') %>% 
+  mutate(Date = as.Date(...1, format = "%Y-%m-%d")) %>%
+  mutate(yearmonth = format(as.Date(Date), "%Y-%m")) %>%
+  select(yearmonth, GDP_level_b, quarterly_growth) %>%
+  na.omit()
+```
+
+# Process Residential Property Price Index data
+```{r}
+house_price <- read_excel(here::here("raw data/Residential Property Price Index.xlsx"), sheet = 2)
+
+# Select variables and rows, and rename
+house_price <- house_price[-c(1:9),] %>% 
+  select(...1,
+          "Residential Property Price Index percentage change from previous quarter ;  Weighted average of eight capital cities ;") %>%
+  rename(ave_quarter_property_price_index_growth =  "Residential Property Price Index percentage change from previous quarter ;  Weighted average of eight capital cities ;")
+
+# Format the date to day-month-year
+house_price$...1 <- as.Date(as.numeric(house_price$...1), origin = "1899-12-30")
+house_price <- house_price %>%
+  mutate(Date = as.Date(...1, format = "%Y-%m-%d")) %>%
+  select(Date, ave_quarter_property_price_index_growth)
+
+#Rounding rates
+house_price$ave_quarter_property_price_index_growth <- as.numeric(house_price$ave_quarter_property_price_index_growth)
+house_price$ave_quarter_property_price_index_growth <- round(house_price$ave_quarter_property_price_index_growth, 2) 
+
+#Remove NA
+house_price <- house_price %>%
+  na.omit()
+
+#Filter period from 2013 to 2023 and group by year month
+house_price <- house_price %>% 
+  mutate(yearmonth = format(as.Date(Date), "%Y-%m")) %>%
+  group_by(yearmonth) %>%
+  filter(Date >= as.Date("2013-01-01")) %>%
+  select(yearmonth, ave_quarter_property_price_index_growth) 
+```
+
+# Join all data into one and export file
+```{r}
+final_data <- full_join(cash_rates, GDP, by = "yearmonth") %>%
+               full_join(house_price, by = "yearmonth") %>%
+               full_join(unemployment, by = "yearmonth") %>%
+               full_join(stock_index, by = "yearmonth") %>%
+               full_join(inflation, by = "yearmonth")
+
+write_csv(final_data, file=here::here("final_data.csv"))
+```
